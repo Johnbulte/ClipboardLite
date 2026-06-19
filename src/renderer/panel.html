@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>轻剪快捷面板</title>
+    <link rel="stylesheet" href="./panel.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header class="panel-head">
+        <div>
+          <strong>轻剪</strong>
+          <span id="summary">剪贴板历史</span>
+        </div>
+        <button id="openMainBtn" title="打开完整窗口">管理</button>
+      </header>
+
+      <div class="search-wrap">
+        <span>⌕</span>
+        <input id="searchInput" type="search" placeholder="搜索剪贴板历史..." autofocus />
+      </div>
+
+      <section id="historyList" class="history-list"></section>
+
+      <footer class="panel-foot">
+        <span><kbd>Enter</kbd> 复制</span>
+        <span><kbd>Esc</kbd> 关闭</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+      </footer>
+    </main>
+
+    <script src="./panel.js"></script>
+  </body>
+</html>

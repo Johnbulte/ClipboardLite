@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>轻剪 Cliply</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="orb orb-one"></div>
+    <div class="orb orb-two"></div>
+
+    <div class="app-shell">
+      <header class="hero">
+        <div class="brand">
+          <div class="logo-mark">C</div>
+          <div>
+            <div class="eyebrow">轻量剪贴板工具</div>
+            <h1>轻剪 <span>Cliply</span></h1>
+            <p id="statusText">保存复制记录，快速搜索、收藏和再次使用</p>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <button id="settingsBtn" class="ghost">设置</button>
+          <button id="clearBtn" class="danger">清空历史</button>
+        </div>
+      </header>
+
+      <section class="feature-row">
+        <div class="feature-card">
+          <div class="feature-icon">📋</div>
+          <div>
+            <strong>自动收集</strong>
+            <span>复制文本后自动保存到本地历史</span>
+          </div>
+        </div>
+            <div class="feature-card active">
+              <div class="feature-icon">🏷️</div>
+              <div>
+                <strong>自动分类</strong>
+                <span>识别文本、图片、文件、链接、代码、邮箱和颜色</span>
+              </div>
+            </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <div>
+            <strong>一键复用</strong>
+            <span>搜索、收藏、复制，减少重复操作</span>
+          </div>
+        </div>
+      </section>
+
+      <main class="layout">
+        <aside class="left-panel glass">
+          <div class="panel-title">内容筛选</div>
+          <nav id="categoryList" class="category-list"></nav>
+        </aside>
+
+        <section class="center-panel glass">
+          <div class="toolbar">
+            <div class="search-wrap">
+              <span>⌕</span>
+              <input id="searchInput" type="search" placeholder="搜索复制过的内容..." />
+            </div>
+            <button id="copyLatestBtn" class="primary">复制最新</button>
+          </div>
+          <div id="statsLine" class="stats"></div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+
+        <aside class="right-panel glass">
+          <div class="panel-title">内容详情</div>
+          <div id="detailEmpty" class="empty-state">复制或选择一条内容查看详情</div>
+          <div id="detailPanel" class="detail-panel hidden">
+            <div class="selected-card">
+              <div class="selected-head">
+                <span id="detailType" class="type-pill"></span>
+                <span id="detailUpdated" class="muted"></span>
+              </div>
+              <div id="detailPreview" class="detail-preview"></div>
+            </div>
+
+            <dl class="detail-meta">
+              <div><dt>创建时间</dt><dd id="detailCreated"></dd></div>
+              <div><dt>内容长度</dt><dd id="detailLength"></dd></div>
+              <div><dt>收藏状态</dt><dd id="detailFavorite"></dd></div>
+            </dl>
+
+            <div id="detailMedia" class="detail-media hidden"></div>
+            <textarea id="detailValue" readonly placeholder="内容会显示在这里"></textarea>
+
+            <div class="detail-actions">
+              <button id="detailCopyBtn" class="primary">复制内容</button>
+              <button id="detailFavoriteBtn" class="ghost">收藏</button>
+              <button id="detailDeleteBtn" class="danger">删除</button>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <div id="toast" class="toast hidden"></div>
+    </div>
+
+    <div id="settingsOverlay" class="settings-overlay hidden">
+      <section class="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="settings-head">
+          <div>
+            <div class="panel-title">偏好设置</div>
+            <h2 id="settingsTitle">轻剪设置</h2>
+            <p>管理监听、窗口行为和全局快捷键。</p>
+          </div>
+          <button id="settingsCloseBtn" class="icon-btn" aria-label="关闭设置">×</button>
+        </div>
+
+        <div class="settings-grid">
+          <div class="settings-section">
+            <div class="section-title">常规</div>
+            <label class="switch-row">
+              <span>
+                <strong>剪贴板监听</strong>
+                <small>复制文本、图片或文件后自动保存到历史。</small>
+              </span>
+              <input id="monitorToggle" type="checkbox" />
+            </label>
+            <label class="switch-row">
+              <span>
+                <strong>关闭时隐藏到托盘</strong>
+                <small>点击关闭按钮时保留后台监听。</small>
+              </span>
+              <input id="closeHideToggle" type="checkbox" />
+            </label>
+            <label class="field card-field">
+              <span>最大保存条数</span>
+              <input id="maxItemsInput" type="number" min="20" max="2000" step="10" />
+            </label>
+          </div>
+
+          <div class="settings-section accent">
+            <div class="section-title">快捷键</div>
+            <label class="field card-field">
+              <span>打开快捷面板</span>
+              <input id="panelShortcutInput" class="shortcut-input" type="text" readonly placeholder="点击后按下组合键" />
+            </label>
+            <div class="shortcut-hint">点击输入框后按下组合键，例如 Ctrl + Shift + V。Esc 取消录制。</div>
+            <div class="shortcut-list">
+              <span><kbd>Ctrl</kbd> + <kbd>F</kbd> 搜索</span>
+              <span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 复制选中</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button id="resetShortcutBtn" class="ghost">恢复默认快捷键</button>
+          <div>
+            <button id="settingsCancelBtn" class="ghost">取消</button>
+            <button id="saveSettingsBtn" class="primary">保存设置</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

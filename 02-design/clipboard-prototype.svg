@@ -1,0 +1,165 @@
+<svg width="2400" height="1600" viewBox="0 0 2400 1600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .board { fill: #ffffff; stroke: #dbe3ee; stroke-width: 2; rx: 20; }
+      .header { fill: #111827; font: 700 28px Arial, sans-serif; }
+      .title { fill: #111827; font: 700 22px Arial, sans-serif; }
+      .text { fill: #374151; font: 16px Arial, sans-serif; }
+      .muted { fill: #6b7280; font: 14px Arial, sans-serif; }
+      .small { fill: #6b7280; font: 12px Arial, sans-serif; }
+      .pill { fill: #eef2ff; stroke: #c7d2fe; stroke-width: 1; rx: 999; }
+      .pillText { fill: #4338ca; font: 13px Arial, sans-serif; }
+      .line { stroke: #e5e7eb; stroke-width: 1; }
+      .accent { fill: #2563eb; }
+      .accentText { fill: #ffffff; font: 14px Arial, sans-serif; font-weight: 700; }
+      .selected { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; rx: 12; }
+      .chip { fill: #f3f4f6; rx: 999; }
+      .chipText { fill: #4b5563; font: 12px Arial, sans-serif; }
+      .danger { fill: #dc2626; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2400" height="1600"/>
+
+  <!-- Board 1: Quick Panel -->
+  <rect class="board" x="80" y="80" width="720" height="520" rx="20"/>
+  <text class="header" x="110" y="125">快捷面板</text>
+  <rect x="110" y="150" width="660" height="54" rx="14" fill="#f9fafb" stroke="#d1d5db"/>
+  <text class="muted" x="132" y="184">搜索剪贴板历史...</text>
+
+  <rect class="selected" x="110" y="224" width="660" height="70" rx="14"/>
+  <text class="title" x="132" y="255">support@example.com</text>
+  <text class="muted" x="132" y="278">邮箱 · 收藏 · 2分钟前</text>
+  <rect class="chip" x="648" y="242" width="86" height="24" rx="999"/>
+  <text class="chipText" x="667" y="259">已收藏</text>
+
+  <rect x="110" y="306" width="660" height="70" rx="14" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="title" x="132" y="337">https://github.com/example/project</text>
+  <text class="muted" x="132" y="360">链接 · 5分钟前</text>
+
+  <rect x="110" y="388" width="660" height="70" rx="14" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="title" x="132" y="419">const user = await getUser(id)</text>
+  <text class="muted" x="132" y="442">代码 · 12分钟前</text>
+
+  <rect x="110" y="470" width="660" height="70" rx="14" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="title" x="132" y="501">这是一段刚刚复制过的文本内容预览...</text>
+  <text class="muted" x="132" y="524">文本 · 20分钟前</text>
+
+  <text class="small" x="110" y="570">↑↓ 选择   Enter 复制   Ctrl+Enter 粘贴   Esc 关闭</text>
+
+  <!-- Board 2: Main Window -->
+  <rect class="board" x="860" y="80" width="1460" height="880" rx="20"/>
+  <text class="header" x="890" y="125">Clipboard Lite</text>
+  <rect x="2150" y="96" width="140" height="36" rx="10" fill="#f3f4f6" stroke="#e5e7eb"/>
+  <text class="text" x="2191" y="119">⚙ 设置</text>
+
+  <line class="line" x1="860" y1="150" x2="2320" y2="150"/>
+
+  <!-- Sidebar -->
+  <rect x="890" y="180" width="180" height="740" rx="16" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text class="title" x="915" y="222">分类</text>
+  <rect x="910" y="246" width="140" height="34" rx="10" fill="#dbeafe"/>
+  <text class="text" x="936" y="268">全部</text>
+  <text class="text" x="936" y="310">收藏</text>
+  <text class="text" x="936" y="352">文本</text>
+  <text class="text" x="936" y="394">链接</text>
+  <text class="text" x="936" y="436">代码</text>
+  <text class="text" x="936" y="478">邮箱</text>
+  <text class="text" x="936" y="520">颜色</text>
+
+  <!-- List -->
+  <rect x="1090" y="180" width="560" height="740" rx="16" fill="#ffffff" stroke="#e5e7eb"/>
+  <rect x="1110" y="204" width="520" height="46" rx="12" fill="#f9fafb" stroke="#d1d5db"/>
+  <text class="muted" x="1130" y="233">搜索历史...</text>
+
+  <rect class="selected" x="1110" y="270" width="520" height="90" rx="14"/>
+  <text class="title" x="1132" y="304">support@example.com</text>
+  <text class="muted" x="1132" y="330">邮箱 · 2分钟前</text>
+  <text class="small" x="1550" y="304">★</text>
+
+  <rect x="1110" y="372" width="520" height="90" rx="14" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="title" x="1132" y="406">https://github.com/example/project</text>
+  <text class="muted" x="1132" y="432">链接 · 5分钟前</text>
+
+  <rect x="1110" y="474" width="520" height="90" rx="14" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="title" x="1132" y="508">const user = await getUser(id)</text>
+  <text class="muted" x="1132" y="534">代码 · 12分钟前</text>
+
+  <rect x="1110" y="576" width="520" height="90" rx="14" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="title" x="1132" y="610">普通文本内容预览...</text>
+  <text class="muted" x="1132" y="636">文本 · 20分钟前</text>
+
+  <rect x="1110" y="678" width="520" height="90" rx="14" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="title" x="1132" y="712">#FFAA00</text>
+  <text class="muted" x="1132" y="738">颜色 · 35分钟前</text>
+
+  <text class="small" x="1110" y="885">共 128 条记录 · 已启用监听 · 数据仅保存在本地</text>
+
+  <!-- Detail -->
+  <rect x="1670" y="180" width="620" height="740" rx="16" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text class="title" x="1700" y="222">内容详情</text>
+  <text class="text" x="1700" y="270">support@example.com</text>
+  <text class="muted" x="1700" y="308">类型：邮箱</text>
+  <text class="muted" x="1700" y="338">创建：2026-06-18 10:42</text>
+  <text class="muted" x="1700" y="368">最后使用：2026-06-18 10:51</text>
+  <text class="muted" x="1700" y="398">使用次数：3 次</text>
+
+  <rect x="1700" y="440" width="560" height="250" rx="16" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="text" x="1724" y="480">support@example.com</text>
+  <text class="small" x="1724" y="520">预览区 / 复制内容区</text>
+
+  <rect x="1700" y="720" width="120" height="40" rx="10" class="accent"/>
+  <text class="accentText" x="1740" y="746">复制</text>
+  <rect x="1832" y="720" width="120" height="40" rx="10" fill="#f3f4f6" stroke="#e5e7eb"/>
+  <text class="text" x="1868" y="746">收藏</text>
+  <rect x="1964" y="720" width="120" height="40" rx="10" fill="#fef2f2" stroke="#fecaca"/>
+  <text class="danger" x="2001" y="746">删除</text>
+
+  <!-- Board 3: Settings -->
+  <rect class="board" x="80" y="660" width="720" height="860" rx="20"/>
+  <text class="header" x="110" y="706">设置</text>
+  <line class="line" x1="80" y1="740" x2="800" y2="740"/>
+
+  <text class="title" x="110" y="790">常规</text>
+  <text class="text" x="130" y="830">[x] 开机启动</text>
+  <text class="text" x="130" y="864">[x] 关闭窗口时最小化到托盘</text>
+  <text class="text" x="130" y="898">[x] 启动后自动监听剪贴板</text>
+
+  <text class="title" x="110" y="960">快捷键</text>
+  <text class="text" x="130" y="1000">快速面板</text>
+  <rect x="270" y="978" width="220" height="34" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+  <text class="text" x="290" y="1001">Ctrl + Shift + V</text>
+  <rect x="510" y="978" width="80" height="34" rx="10" fill="#f3f4f6" stroke="#e5e7eb"/>
+  <text class="text" x="532" y="1001">修改</text>
+
+  <text class="title" x="110" y="1080">历史记录</text>
+  <text class="text" x="130" y="1120">最大保存数量</text>
+  <rect x="270" y="1102" width="120" height="34" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+  <text class="text" x="292" y="1125">500</text>
+  <text class="text" x="130" y="1160">[x] 自动去重</text>
+  <text class="text" x="130" y="1194">[x] 收藏内容不自动清理</text>
+  <rect x="130" y="1230" width="180" height="38" rx="10" fill="#fef2f2" stroke="#fecaca"/>
+  <text class="danger" x="158" y="1255">清空历史记录</text>
+
+  <text class="title" x="110" y="1310">隐私</text>
+  <text class="text" x="130" y="1350">[x] 启用敏感内容过滤</text>
+  <text class="text" x="130" y="1384">[x] 不保存密码/token 类内容</text>
+  <rect x="130" y="1420" width="360" height="34" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+  <text class="small" x="150" y="1443">黑名单应用：1Password.exe, Bitwarden.exe</text>
+
+  <!-- Board 4: Tray Menu -->
+  <rect class="board" x="860" y="1080" width="420" height="300" rx="20"/>
+  <text class="header" x="890" y="1125">托盘菜单</text>
+  <rect x="900" y="1150" width="340" height="40" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="text" x="920" y="1175">打开快速面板</text>
+  <rect x="900" y="1198" width="340" height="40" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="text" x="920" y="1223">打开主窗口</text>
+  <rect x="900" y="1246" width="340" height="40" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="text" x="920" y="1271">暂停监听</text>
+  <line class="line" x1="900" y1="1314" x2="1240" y2="1314"/>
+  <rect x="900" y="1330" width="340" height="40" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="text" x="920" y="1355">设置</text>
+  <rect x="900" y="1378" width="340" height="40" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+  <text class="danger" x="920" y="1403">退出</text>
+</svg>
