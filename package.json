@@ -5,9 +5,38 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "payment:dev": "node scripts/payment-server.js",
+    "test": "node test-table-parser.js",
+    "dist": "electron-builder --win portable",
+    "dist:dir": "electron-builder --win dir"
+  },
+  "build": {
+    "appId": "com.cliply.app",
+    "productName": "Cliply",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-win-portable.${ext}"
+    }
   },
   "devDependencies": {
-    "electron": "^31.3.1"
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "sax": "^1.4.1"
   }
 }

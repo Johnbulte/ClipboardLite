@@ -10,10 +10,15 @@ const state = {
 const el = {
   statusText: document.getElementById('statusText'),
   categoryList: document.getElementById('categoryList'),
+  templateTitleInput: document.getElementById('templateTitleInput'),
+  templateContentInput: document.getElementById('templateContentInput'),
+  saveTemplateBtn: document.getElementById('saveTemplateBtn'),
+  templateList: document.getElementById('templateList'),
   historyList: document.getElementById('historyList'),
   statsLine: document.getElementById('statsLine'),
   searchInput: document.getElementById('searchInput'),
   copyLatestBtn: document.getElementById('copyLatestBtn'),
+  planBtn: document.getElementById('planBtn'),
   settingsBtn: document.getElementById('settingsBtn'),
   settingsOverlay: document.getElementById('settingsOverlay'),
   settingsCloseBtn: document.getElementById('settingsCloseBtn'),
@@ -21,9 +26,15 @@ const el = {
   clearBtn: document.getElementById('clearBtn'),
   monitorToggle: document.getElementById('monitorToggle'),
   closeHideToggle: document.getElementById('closeHideToggle'),
+  launchOnStartupToggle: document.getElementById('launchOnStartupToggle'),
+  sensitiveProtectionToggle: document.getElementById('sensitiveProtectionToggle'),
+  sensitiveActionSelect: document.getElementById('sensitiveActionSelect'),
+  exportBackupBtn: document.getElementById('exportBackupBtn'),
+  importBackupBtn: document.getElementById('importBackupBtn'),
   maxItemsInput: document.getElementById('maxItemsInput'),
   panelShortcutInput: document.getElementById('panelShortcutInput'),
   resetShortcutBtn: document.getElementById('resetShortcutBtn'),
+  settingsUpgradeBtn: document.getElementById('settingsUpgradeBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   detailEmpty: document.getElementById('detailEmpty'),
   detailPanel: document.getElementById('detailPanel'),
@@ -35,10 +46,22 @@ const el = {
   detailFavorite: document.getElementById('detailFavorite'),
   detailMedia: document.getElementById('detailMedia'),
   detailValue: document.getElementById('detailValue'),
+  textTools: document.getElementById('textTools'),
   detailCopyBtn: document.getElementById('detailCopyBtn'),
+  detailCopyTableBtn: document.getElementById('detailCopyTableBtn'),
+  detailPasteTableBtn: document.getElementById('detailPasteTableBtn'),
   detailFavoriteBtn: document.getElementById('detailFavoriteBtn'),
   detailDeleteBtn: document.getElementById('detailDeleteBtn'),
-  toast: document.getElementById('toast')
+  toast: document.getElementById('toast'),
+  upgradeOverlay: document.getElementById('upgradeOverlay'),
+  upgradeCloseBtn: document.getElementById('upgradeCloseBtn'),
+  upgradeCancelBtn: document.getElementById('upgradeCancelBtn'),
+  checkoutEmailInput: document.getElementById('checkoutEmailInput'),
+  openCheckoutBtn: document.getElementById('openCheckoutBtn'),
+  licenseKeyInput: document.getElementById('licenseKeyInput'),
+  activateLicenseBtn: document.getElementById('activateLicenseBtn'),
+  upgradeReason: document.getElementById('upgradeReason'),
+  comparisonTable: document.getElementById('comparisonTable')
 };
 
 let toastTimer = null;
@@ -49,6 +72,52 @@ let historyScrollFrame = null;
 let historyRenderedStart = -1;
 let historyRenderedEnd = -1;
 let recordingShortcut = false;
+
+function isPro() {
+  return state.data?.subscription?.plan === 'pro';
+}
+
+function requiresProForItem(item, action) {
+  if (!item) return '';
+  if (action === 'table' || item.type === 'table') return '表格识别、复制为表格和粘贴为表格需要 Pro。';
+  if (action === 'text-transform') return '文本增强需要 Pro。';
+  if (item.type === 'image') return '图片剪贴板记录需要 Pro。';
+  if (item.type === 'file') return '文件剪贴板记录需要 Pro。';
+  return '';
+}
+
+async function openUpgrade(reason = '') {
+  if (reason) {
+    el.upgradeReason.textContent = reason;
+    el.upgradeReason.classList.remove('hidden');
+  } else {
+    el.upgradeReason.classList.add('hidden');
+  }
+  const comparison = await api.getPlanComparison();
+  el.comparisonTable.innerHTML = `
+    <div class="comparison-head"><span>功能</span><span>普通版</span><span>Pro</span></div>
+    ${comparison.map(row => `
+      <div class="comparison-row">
+        <span>${escapeHtml(row.feature)}</span>
+        <span>${escapeHtml(row.free)}</span>
+        <span>${escapeHtml(row.pro)}</span>
+      </div>
+    `).join('')}
+  `;
+  el.upgradeOverlay.classList.remove('hidden');
+}
+
+function closeUpgrade() {
+  el.upgradeOverlay.classList.add('hidden');
+}
+
+function paymentErrorMessage(error) {
+  const message = error?.message || String(error || '');
+  if (message.includes('Payment service is not configured')) {
+    return '请先配置 CLIPLY_PAYMENT_API_URL。';
+  }
+  return message || '支付服务暂时不可用。';
+}
 
 function displayShortcut(value) {
   return String(value || 'Control+Shift+V')
@@ -89,6 +158,7 @@ function showToast(message) {
 }
 
 function typeLabel(key) {
+  if (key === 'table') return '表格';
   return {
     text: '文本',
     link: '链接',
@@ -101,6 +171,7 @@ function typeLabel(key) {
 }
 
 function categoryLabel(key) {
+  if (key === 'table') return '表格';
   return {
     all: '全部',
     favorite: '收藏',
@@ -158,11 +229,14 @@ function renderCategories() {
     favorite: state.data.history.filter(item => item.favorite).length,
     text: state.data.history.filter(item => item.type === 'text').length,
     link: state.data.history.filter(item => item.type === 'link').length,
-    code: state.data.history.filter(item => item.type === 'code').length,
-    email: state.data.history.filter(item => item.type === 'email').length,
-    color: state.data.history.filter(item => item.type === 'color').length,
-    image: state.data.history.filter(item => item.type === 'image').length,
-    file: state.data.history.filter(item => item.type === 'file').length
+    ...(isPro() ? {
+      code: state.data.history.filter(item => item.type === 'code').length,
+      email: state.data.history.filter(item => item.type === 'email').length,
+      color: state.data.history.filter(item => item.type === 'color').length,
+      table: state.data.history.filter(item => item.type === 'table').length,
+      image: state.data.history.filter(item => item.type === 'image').length,
+      file: state.data.history.filter(item => item.type === 'file').length
+    } : {})
   };
 
   el.categoryList.innerHTML = Object.entries(counts).map(([key, count]) => `
@@ -289,6 +363,21 @@ function renderHistory() {
   });
 }
 
+function renderTablePreview(rows) {
+  const safeRows = Array.isArray(rows) ? rows.slice(0, 20) : [];
+  if (!safeRows.length) return '';
+  return `
+    <div class="table-preview">
+      <table>
+        <tbody>
+          ${safeRows.map(row => `
+            <tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
 function renderDetail() {
   const item = getSelectedItem();
   if (!item) {
@@ -308,9 +397,14 @@ function renderDetail() {
   el.detailValue.value = item.value || '';
   el.detailFavorite.textContent = item.favorite ? '已收藏' : '未收藏';
   el.detailFavoriteBtn.textContent = item.favorite ? '取消收藏' : '收藏';
+  el.detailCopyBtn.textContent = item.type === 'table' ? '复制表格' : '复制内容';
   el.detailMedia.classList.add('hidden');
   el.detailMedia.innerHTML = '';
   el.detailValue.classList.remove('hidden');
+  el.textTools.classList.toggle('hidden', item.kind !== 'text' || item.type === 'table');
+  el.textTools.classList.toggle('locked', !isPro());
+  el.detailCopyTableBtn.classList.toggle('hidden', item.type !== 'table');
+  el.detailPasteTableBtn.classList.toggle('hidden', item.type !== 'table');
 
   if (item.type === 'image') {
     el.detailLength.textContent = `${item.width || '-'} × ${item.height || '-'} px`;
@@ -325,14 +419,58 @@ function renderDetail() {
         ${paths.map(filePath => `<div class="file-row">📄 ${escapeHtml(filePath)}</div>`).join('')}
       </div>`;
     el.detailMedia.classList.remove('hidden');
+  } else if (item.type === 'table') {
+    el.detailLength.textContent = `${item.tableRowCount || item.tableRows?.length || '-'} 行 x ${item.tableColumnCount || '-'} 列`;
+    el.detailMedia.innerHTML = renderTablePreview(item.tableRows);
+    el.detailMedia.classList.remove('hidden');
   } else {
     el.detailLength.textContent = `${String(item.value || '').length} 字符`;
   }
 
   el.detailCopyBtn.onclick = async () => {
-    await api.copyItem(item.id);
-    showToast('已复制到剪贴板');
+    const proReason = !isPro() ? requiresProForItem(item) : '';
+    if (proReason) {
+      await openUpgrade(proReason);
+      return;
+    }
+    if (item.type === 'table') {
+      if (!isPro()) {
+        await openUpgrade(requiresProForItem(item, 'table'));
+        return;
+      }
+      await api.copyItemAsTable(item.id);
+      showToast('已复制为表格');
+    } else {
+      await api.copyItem(item.id);
+      showToast('已复制到剪贴板');
+    }
   };
+  el.detailCopyTableBtn.onclick = async () => {
+    if (!isPro()) {
+      await openUpgrade(requiresProForItem(item, 'table'));
+      return;
+    }
+    const ok = await api.copyItemAsTable(item.id);
+    showToast(ok ? '已复制为表格' : '无法识别为表格');
+  };
+  el.detailPasteTableBtn.onclick = async () => {
+    if (!isPro()) {
+      await openUpgrade(requiresProForItem(item, 'table'));
+      return;
+    }
+    const ok = await api.pasteItemAsTable(item.id);
+    showToast(ok ? '已粘贴为表格' : '无法识别为表格');
+  };
+  el.textTools.querySelectorAll('[data-text-action]').forEach(button => {
+    button.onclick = async () => {
+      if (!isPro()) {
+        await openUpgrade(requiresProForItem(item, 'text-transform'));
+        return;
+      }
+      const ok = await api.copyItemTransformed(item.id, button.dataset.textAction);
+      showToast(ok ? '已复制处理后的文本' : '无法处理该内容');
+    };
+  });
   el.detailFavoriteBtn.onclick = async () => {
     await api.toggleFavorite(item.id);
     showToast(item.favorite ? '已取消收藏' : '已加入收藏');
@@ -348,18 +486,61 @@ function renderDetail() {
   };
 }
 
+function renderTemplates() {
+  const templates = state.data.templates || [];
+  if (!isPro()) {
+    el.templateList.innerHTML = '<div class="template-empty">升级 Pro 后可保存常用文案，点击复制后手动粘贴。</div>';
+    el.saveTemplateBtn.disabled = true;
+    return;
+  }
+  el.saveTemplateBtn.disabled = false;
+  if (!templates.length) {
+    el.templateList.innerHTML = '<div class="template-empty">还没有常用文案，先保存一条常用内容。</div>';
+    return;
+  }
+  el.templateList.innerHTML = templates.map(template => [
+    '<div class="template-item" data-id="' + escapeHtml(template.id) + '">',
+    '<strong>' + escapeHtml(template.title) + '</strong>',
+    '<span>' + escapeHtml(template.content.slice(0, 80)) + '</span>',
+    '<div><button class="ghost" data-action="copy">复制</button><button class="danger" data-action="delete">删除</button></div>',
+    '</div>'
+  ].join('')).join('');
+  el.templateList.querySelectorAll('.template-item button').forEach(button => {
+    button.addEventListener('click', async () => {
+      const id = button.closest('.template-item').dataset.id;
+      if (button.dataset.action === 'copy') {
+        const ok = await api.copyTemplate(id);
+        showToast(ok ? '文案已复制，请手动粘贴' : '复制失败');
+      } else {
+        await api.deleteTemplate(id);
+        showToast('文案已删除');
+      }
+    });
+  });
+}
 function renderSettings() {
   el.monitorToggle.checked = !!state.data.settings.monitorClipboard;
   el.closeHideToggle.checked = !!state.data.settings.hideOnClose;
+  el.launchOnStartupToggle.checked = !!state.data.settings.launchOnStartup;
+  el.sensitiveProtectionToggle.checked = !!state.data.settings.sensitiveProtection;
+  el.sensitiveProtectionToggle.disabled = !isPro();
+  el.sensitiveActionSelect.value = state.data.settings.sensitiveAction || 'redact';
+  el.sensitiveActionSelect.disabled = !isPro();
+  el.closeHideToggle.disabled = !isPro();
   el.maxItemsInput.value = state.data.settings.maxItems;
+  el.maxItemsInput.max = isPro() ? 2000 : 100;
   el.panelShortcutInput.value = displayShortcut(state.data.settings.panelShortcut || 'Control+Shift+V');
   el.panelShortcutInput.dataset.shortcut = state.data.settings.panelShortcut || 'Control+Shift+V';
+  el.settingsUpgradeBtn.classList.toggle('hidden', isPro());
 }
 
 function renderStats() {
   const total = state.data.history.length;
   const favorites = state.data.history.filter(item => item.favorite).length;
-  el.statsLine.textContent = `共 ${total} 条记录 · ${favorites} 条收藏 · 本地保存 · 监听 ${state.data.settings.monitorClipboard ? '开启' : '关闭'}`;
+  const planText = isPro() ? 'Pro 已激活' : '普通版';
+  el.planBtn.textContent = planText;
+  el.planBtn.classList.toggle('plan-pro', isPro());
+  el.statsLine.textContent = `${planText} · 共 ${total} 条记录 · ${favorites} 条收藏 · 本地保存 · 监听 ${state.data.settings.monitorClipboard ? '开启' : '关闭'}`;
   el.statusText.textContent = state.data.settings.monitorClipboard
     ? '正在监听剪贴板，复制后自动保存到历史'
     : '剪贴板监听已暂停';
@@ -368,6 +549,7 @@ function renderStats() {
 function render() {
   if (!state.data) return;
   renderCategories();
+  renderTemplates();
   renderHistory();
   renderDetail();
   renderSettings();
@@ -398,8 +580,18 @@ el.historyList.addEventListener('scroll', () => {
 el.copyLatestBtn.addEventListener('click', async () => {
   const item = getFilteredItems()[0];
   if (item) {
-    await api.copyItem(item.id);
-    showToast('已复制最新内容');
+    const proReason = !isPro() ? requiresProForItem(item) : '';
+    if (proReason) {
+      await openUpgrade(proReason);
+      return;
+    }
+    if (item.type === 'table') {
+      await api.copyItemAsTable(item.id);
+      showToast('已复制最新表格');
+    } else {
+      await api.copyItem(item.id);
+      showToast('已复制最新内容');
+    }
   }
 });
 
@@ -416,8 +608,11 @@ el.saveSettingsBtn.addEventListener('click', async () => {
     await api.updateSettings({
       monitorClipboard: el.monitorToggle.checked,
       hideOnClose: el.closeHideToggle.checked,
+      launchOnStartup: el.launchOnStartupToggle.checked,
       maxItems: Number(el.maxItemsInput.value || 200),
-      panelShortcut: el.panelShortcutInput.dataset.shortcut || 'Control+Shift+V'
+      panelShortcut: el.panelShortcutInput.dataset.shortcut || 'Control+Shift+V',
+      sensitiveProtection: el.sensitiveProtectionToggle.checked,
+      sensitiveAction: el.sensitiveActionSelect.value || 'redact'
     });
     closeSettings();
     showToast('设置已保存');
@@ -427,6 +622,46 @@ el.saveSettingsBtn.addEventListener('click', async () => {
 });
 
 el.settingsBtn.addEventListener('click', openSettings);
+el.saveTemplateBtn.addEventListener('click', async () => {
+  if (!isPro()) {
+    await openUpgrade('常用文案是 Pro 功能，可保存常用内容，点击复制后手动粘贴。');
+    return;
+  }
+  const content = el.templateContentInput.value.trim();
+  if (!content) {
+    showToast('请先输入文案内容');
+    return;
+  }
+  const ok = await api.saveTemplate({
+    title: el.templateTitleInput.value.trim() || content.slice(0, 24),
+    content
+  });
+  if (ok) {
+    el.templateTitleInput.value = '';
+    el.templateContentInput.value = '';
+    showToast('文案已保存');
+  }
+});
+el.exportBackupBtn.addEventListener('click', async () => {
+  if (!isPro()) {
+    await openUpgrade('备份导入导出是 Pro 功能，用于迁移和长期保存数据。');
+    return;
+  }
+  const ok = await api.exportBackup();
+  showToast(ok ? '备份已导出' : '已取消导出');
+});
+el.importBackupBtn.addEventListener('click', async () => {
+  if (!isPro()) {
+    await openUpgrade('备份导入导出是 Pro 功能，用于迁移和长期保存数据。');
+    return;
+  }
+  const ok = await api.importBackup();
+  showToast(ok ? '备份已导入' : '已取消导入');
+});
+el.planBtn.addEventListener('click', () => {
+  if (!isPro()) openUpgrade();
+});
+el.settingsUpgradeBtn.addEventListener('click', () => openUpgrade());
 el.settingsCloseBtn.addEventListener('click', closeSettings);
 el.settingsCancelBtn.addEventListener('click', closeSettings);
 el.settingsOverlay.addEventListener('click', (event) => {
@@ -435,6 +670,44 @@ el.settingsOverlay.addEventListener('click', (event) => {
 el.resetShortcutBtn.addEventListener('click', () => {
   el.panelShortcutInput.dataset.shortcut = 'Control+Shift+V';
   el.panelShortcutInput.value = displayShortcut('Control+Shift+V');
+});
+el.upgradeCloseBtn.addEventListener('click', closeUpgrade);
+el.upgradeCancelBtn.addEventListener('click', closeUpgrade);
+el.upgradeOverlay.addEventListener('click', (event) => {
+  if (event.target === el.upgradeOverlay) closeUpgrade();
+});
+el.openCheckoutBtn.addEventListener('click', async () => {
+  try {
+    const checkout = await api.createCheckout({
+      email: el.checkoutEmailInput.value.trim()
+    });
+    if (!checkout?.checkoutUrl) {
+      showToast('支付服务没有返回结账链接');
+      return;
+    }
+    await api.openExternal(checkout.checkoutUrl);
+    showToast('已打开支付页，完成后请粘贴授权码激活');
+  } catch (error) {
+    showToast(paymentErrorMessage(error));
+  }
+});
+el.activateLicenseBtn.addEventListener('click', async () => {
+  const licenseKey = el.licenseKeyInput.value.trim();
+  if (!licenseKey) {
+    showToast('请输入授权码');
+    return;
+  }
+  try {
+    const result = await api.activateLicense({ licenseKey });
+    if (result?.subscription?.plan === 'pro') {
+      closeUpgrade();
+      showToast('Pro 已激活');
+      return;
+    }
+    showToast('授权码未解锁 Pro');
+  } catch (error) {
+    showToast(paymentErrorMessage(error));
+  }
 });
 el.panelShortcutInput.addEventListener('focus', () => {
   recordingShortcut = true;
@@ -472,6 +745,11 @@ document.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'enter') {
     const item = getSelectedItem();
     if (item) {
+      const proReason = !isPro() ? requiresProForItem(item) : '';
+      if (proReason) {
+        openUpgrade(proReason);
+        return;
+      }
       api.copyItem(item.id);
       showToast('已复制选中内容');
     }

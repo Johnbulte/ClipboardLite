@@ -3,6 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const childProcess = require('child_process');
 const { parseTable, tableToTsv } = require('./tableParser');
+const { transformText } = require('./textTransforms');
+const {
+  PLAN_FREE,
+  PLAN_PRO,
+  canUseFeature,
+  getHistoryLimit,
+  getPlanComparison
+} = require('./entitlements');
+const { createPaymentClient } = require('./paymentClient');
 
 app.disableHardwareAcceleration();
 
@@ -11,10 +20,29 @@ const INPUT_HELPER_VERSION = '2';
 const DEFAULT_SETTINGS = {
   monitorClipboard: true,
   hideOnClose: true,
-  maxItems: 200,
+  maxItems: 100,
   panelShortcut: 'Control+Shift+V',
-  launchOnStartup: false
+  launchOnStartup: false,
+  sensitiveProtection: false,
+  sensitiveAction: 'redact',
+  sensitiveProtectionInitialized: false
 };
+const DEFAULT_SECURITY_RULES = {
+  password: true,
+  token: true,
+  card: true,
+  idNumber: true
+};
+const BACKUP_VERSION = 1;
+const DEFAULT_SUBSCRIPTION = {
+  plan: PLAN_FREE,
+  upgradedAt: '',
+  licenseKey: '',
+  activatedAt: '',
+  expiresAt: ''
+};
+
+const paymentClient = createPaymentClient();
 
 let mainWindow = null;
 let panelWindow = null;
@@ -29,8 +57,101 @@ let lastFocusedExternalHwnd = '';
 let inputHelperPath = '';
 let state = {
   settings: { ...DEFAULT_SETTINGS },
-  history: []
+  subscription: { ...DEFAULT_SUBSCRIPTION },
+  history: [],
+  templates: [],
+  securityRules: { ...DEFAULT_SECURITY_RULES }
 };
+
+function canUseProFeature(feature) {
+  return canUseFeature(state.subscription, feature);
+}
+
+function normalizeTemplate(template) {
+  const now = new Date().toISOString();
+  return {
+    id: template.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    title: String(template.title || '').trim().slice(0, 80) || 'Untitled template',
+    content: String(template.content || '').replace(/\r\n/g, '\n'),
+    category: String(template.category || 'General').trim().slice(0, 40) || 'General',
+    favorite: !!template.favorite,
+    createdAt: template.createdAt || now,
+    updatedAt: template.updatedAt || now
+  };
+}
+
+function detectSensitiveText(value) {
+  const text = String(value || '');
+  const hits = [];
+  if (state.securityRules.password && /(?:\b(?:pass(?:word)?|pwd|secret)\b|\u5bc6\u7801|\u53e3\u4ee4|\u5bc6\u94a5)\s*[:\uff1a=]\s*\S{4,}/i.test(text)) hits.push('password');
+  if (state.securityRules.token && /(?:\b(?:sk-[A-Za-z0-9_-]{16,}|[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,})\b|\b(?:api[_-]?key|token|bearer|access[_-]?token|secret[_-]?key)\b\s*[:\uff1a= ]\s*[A-Za-z0-9._-]{12,})/i.test(text)) hits.push('token');
+  if (state.securityRules.card && /\b(?:\d[ -]*?){13,19}\b/.test(text)) hits.push('card');
+  if (state.securityRules.idNumber && /\b\d{17}[0-9Xx]\b/.test(text)) hits.push('idNumber');
+  return [...new Set(hits)];
+}
+
+function redactSensitiveText(value) {
+  return String(value || '')
+    .replace(/((?:\b(?:pass(?:word)?|pwd|secret)\b|\u5bc6\u7801|\u53e3\u4ee4|\u5bc6\u94a5)\s*[:\uff1a=]\s*)\S{4,}/ig, '$1***')
+    .replace(/((?:\b(?:api[_-]?key|token|bearer|access[_-]?token|secret[_-]?key)\b)\s*[:\uff1a= ]\s*)[A-Za-z0-9._-]{8,}/ig, '$1***')
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, 'sk-***')
+    .replace(/\b[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b/g, '***.***.***')
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, '**** **** **** ****')
+    .replace(/\b(\d{6})\d{8}(\d{3}[0-9Xx])\b/g, '$1********$2');
+}
+
+function protectSensitiveItem(item) {
+  normalizeExistingItem(item);
+  if (item.kind !== 'text' || !item.value) return false;
+  const sensitiveMatches = detectSensitiveText(item.value);
+  if (!sensitiveMatches.length) return false;
+  item.sensitive = true;
+  item.sensitiveTypes = sensitiveMatches;
+  if (state.settings.sensitiveAction === 'skip') return true;
+  const redacted = redactSensitiveText(item.value);
+  if (redacted !== item.value) {
+    item.value = redacted;
+    item.preview = previewOf(redacted);
+    item.updatedAt = new Date().toISOString();
+  }
+  return false;
+}
+
+function applySensitiveProtectionToHistory() {
+  if (!state.settings.sensitiveProtection || !canUseProFeature('sensitiveProtection')) return false;
+  let changed = false;
+  const kept = [];
+  for (const item of state.history) {
+    const before = item.value;
+    const shouldDrop = protectSensitiveItem(item);
+    if (shouldDrop) {
+      changed = true;
+    } else {
+      kept.push(item);
+      if (item.sensitive || item.value !== before) changed = true;
+    }
+  }
+  if (kept.length !== state.history.length) changed = true;
+  state.history = kept;
+  return changed;
+}
+
+function makeBackupPayload() {
+  return {
+    app: 'Cliply',
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    settings: state.settings,
+    subscription: state.subscription,
+    securityRules: state.securityRules,
+    templates: state.templates,
+    history: state.history
+  };
+}
+
+function requiresProToCopy(item) {
+  return item?.type === 'table' || item?.kind === 'image' || item?.kind === 'file';
+}
 
 function sortHistoryItems(items) {
   return [...items].sort((a, b) => {
@@ -209,9 +330,23 @@ function loadState() {
     const raw = fs.readFileSync(getStatePath(), 'utf8');
     const parsed = JSON.parse(raw);
     state.settings = { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) };
+    state.subscription = { ...DEFAULT_SUBSCRIPTION, ...(parsed.subscription || {}) };
+    state.securityRules = { ...DEFAULT_SECURITY_RULES, ...(parsed.securityRules || {}) };
+    if (state.subscription.plan === PLAN_PRO && !state.settings.sensitiveProtectionInitialized) {
+      state.settings.sensitiveProtection = true;
+      state.settings.sensitiveAction = state.settings.sensitiveAction || 'redact';
+      state.settings.sensitiveProtectionInitialized = true;
+    }
+    state.templates = Array.isArray(parsed.templates) ? parsed.templates.map(normalizeTemplate).filter(template => template.content) : [];
+    state.settings.maxItems = Math.min(getHistoryLimit(state.subscription), Math.max(20, Number(state.settings.maxItems) || getHistoryLimit(state.subscription)));
     state.history = Array.isArray(parsed.history) ? sortHistoryItems(parsed.history.map(normalizeExistingItem)) : [];
+    state.history = state.history.slice(0, getHistoryLimit(state.subscription));
+    if (applySensitiveProtectionToHistory()) saveState();
   } catch {
     state.settings = { ...DEFAULT_SETTINGS };
+    state.subscription = { ...DEFAULT_SUBSCRIPTION };
+    state.securityRules = { ...DEFAULT_SECURITY_RULES };
+    state.templates = [];
     state.history = [];
   }
 }
@@ -225,8 +360,17 @@ function saveState() {
 }
 
 function applySystemSettings() {
-  app.setLoginItemSettings({
+  const options = {
     openAtLogin: !!state.settings.launchOnStartup
+  };
+  if (process.platform === 'win32') {
+    options.path = process.execPath;
+    if (!app.isPackaged) {
+      options.args = [app.getAppPath()];
+    }
+  }
+  app.setLoginItemSettings({
+    ...options
   });
 }
 
@@ -482,6 +626,11 @@ function normalizeExistingItem(item) {
       item.tableColumnCount = parsed.columnCount;
     }
   }
+  if (item.kind === 'text' && item.type === 'table') {
+    const rows = item.tableRowCount || item.tableRows?.length || 0;
+    const cols = item.tableColumnCount || (Array.isArray(item.tableRows) ? Math.max(...item.tableRows.map(row => row.length)) : 0);
+    if (rows && cols) item.preview = `表格 ${rows} 行 x ${cols} 列`;
+  }
   if (item.kind === 'image' && !item.preview) item.preview = '图片';
   if (item.kind === 'file' && !Array.isArray(item.paths)) item.paths = [];
   if (typeof item.pinned !== 'boolean') item.pinned = false;
@@ -507,22 +656,32 @@ function upsertClipboardItem(nextItem) {
   if (item.kind === 'text') {
     item.value = String(item.value || '').replace(/\r\n/g, '\n').trimEnd();
     if (!item.value) return false;
+    if (state.settings.sensitiveProtection && canUseProFeature('sensitiveProtection')) {
+      const shouldDrop = protectSensitiveItem(item);
+      if (shouldDrop) return false;
+    }
     const parsedTable = parseTable(item.value);
     if (parsedTable) {
+      if (!canUseProFeature('tableTools')) return false;
       item.type = 'table';
       item.tableRows = parsedTable.rows;
       item.tableRowCount = parsedTable.rowCount;
       item.tableColumnCount = parsedTable.columnCount;
-      item.preview = `Table ${parsedTable.rowCount} rows x ${parsedTable.columnCount} cols`;
+      item.preview = `表格 ${parsedTable.rowCount} 行 x ${parsedTable.columnCount} 列`;
     } else {
       item.preview = previewOf(item.value);
       item.type = detectType(item.value);
+      if (['code', 'email', 'color'].includes(item.type) && !canUseProFeature('advancedCategories')) {
+        item.type = extractHyperlink(item.value) ? 'link' : 'text';
+      }
     }
   } else if (item.kind === 'image') {
+    if (!canUseProFeature('imageHistory')) return false;
     if (!item.dataUrl) return false;
     item.type = 'image';
     item.preview = item.preview || '图片';
   } else if (item.kind === 'file') {
+    if (!canUseProFeature('fileHistory')) return false;
     item.paths = Array.isArray(item.paths) ? item.paths.filter(Boolean) : [];
     if (!item.paths.length) return false;
     item.type = 'file';
@@ -553,7 +712,8 @@ function upsertClipboardItem(nextItem) {
   };
 
   state.history = sortHistoryItems([historyItem, ...state.history.filter(entry => !matchesSameContent(entry, historyItem))]);
-  state.history = state.history.slice(0, Math.max(20, Number(state.settings.maxItems) || DEFAULT_SETTINGS.maxItems));
+  const limit = Math.min(getHistoryLimit(state.subscription), Math.max(20, Number(state.settings.maxItems) || DEFAULT_SETTINGS.maxItems));
+  state.history = state.history.slice(0, limit);
   saveState();
   broadcastState();
   return true;
@@ -568,6 +728,27 @@ function sendStateTo(win) {
 function broadcastState() {
   sendStateTo(mainWindow);
   sendStateTo(panelWindow);
+}
+
+function applySubscription(subscription) {
+  state.subscription = {
+    ...DEFAULT_SUBSCRIPTION,
+    ...(subscription || {})
+  };
+  if (state.subscription.plan === PLAN_PRO) {
+    state.subscription.upgradedAt = state.subscription.upgradedAt || state.subscription.activatedAt || new Date().toISOString();
+    state.settings.maxItems = Math.max(Number(state.settings.maxItems) || 0, 200);
+    state.settings.sensitiveProtection = true;
+    state.settings.sensitiveAction = state.settings.sensitiveAction || 'redact';
+    state.settings.sensitiveProtectionInitialized = true;
+  } else {
+    state.settings.maxItems = Math.min(getHistoryLimit(state.subscription), Math.max(20, Number(state.settings.maxItems) || DEFAULT_SETTINGS.maxItems));
+  }
+  applySensitiveProtectionToHistory();
+  state.history = state.history.slice(0, getHistoryLimit(state.subscription));
+  saveState();
+  broadcastState();
+  return state.subscription;
 }
 
 function readClipboardLoop() {
@@ -658,6 +839,7 @@ function copyHistoryItem(id) {
   const item = state.history.find(entry => entry.id === id);
   if (!item) return false;
   normalizeExistingItem(item);
+  if (!canUseProFeature('tableTools') && requiresProToCopy(item)) return false;
 
   suppressNextClipboardRead = true;
   if (item.kind === 'image') {
@@ -676,6 +858,7 @@ function copyHistoryItem(id) {
 }
 
 function copyHistoryItemAsTable(id) {
+  if (!canUseProFeature('tableTools')) return false;
   const item = state.history.find(entry => entry.id === id);
   if (!item) return false;
   normalizeExistingItem(item);
@@ -692,7 +875,26 @@ function copyHistoryItemAsTable(id) {
   item.tableRows = parsed.rows;
   item.tableRowCount = parsed.rows.length;
   item.tableColumnCount = Math.max(...parsed.rows.map(row => row.length));
-  item.preview = `Table ${item.tableRowCount} rows x ${item.tableColumnCount} cols`;
+  item.preview = `表格 ${item.tableRowCount} 行 x ${item.tableColumnCount} 列`;
+  state.history = sortHistoryItems([item, ...state.history.filter(entry => entry.id !== id)]);
+  saveState();
+  broadcastState();
+  return true;
+}
+
+function copyHistoryItemWithTransform(id, action) {
+  if (!canUseProFeature('textTransforms')) return false;
+  const item = state.history.find(entry => entry.id === id);
+  if (!item) return false;
+  normalizeExistingItem(item);
+  if (item.kind !== 'text') return false;
+
+  const transformed = transformText(item.value || '', action);
+  if (!transformed) return false;
+
+  suppressNextClipboardRead = true;
+  clipboard.writeText(transformed);
+  item.updatedAt = new Date().toISOString();
   state.history = sortHistoryItems([item, ...state.history.filter(entry => entry.id !== id)]);
   saveState();
   broadcastState();
@@ -736,15 +938,48 @@ function showItemContextMenu(win, id) {
         broadcastState();
       }
     },
-    ...(item.type === 'table' || parseTable(item.value || '') ? [
+    ...(canUseProFeature('tableTools') && (item.type === 'table' || parseTable(item.value || '')) ? [
       { type: 'separator' },
       {
-        label: 'Copy as table',
+        label: '复制为表格',
         click: () => copyHistoryItemAsTable(item.id)
       },
       {
-        label: 'Paste as table',
+        label: '粘贴为表格',
         click: () => pasteHistoryItemAsTable(item.id)
+      }
+    ] : []),
+    ...(canUseProFeature('textTransforms') && item.kind === 'text' ? [
+      { type: 'separator' },
+      {
+        label: '文本增强',
+        submenu: [
+          {
+            label: '复制为单行',
+            click: () => copyHistoryItemWithTransform(item.id, 'single-line')
+          },
+          {
+            label: '复制并去多余空格',
+            click: () => copyHistoryItemWithTransform(item.id, 'clean-spaces')
+          },
+          {
+            label: '复制并去重行',
+            click: () => copyHistoryItemWithTransform(item.id, 'dedupe-lines')
+          },
+          {
+            label: '复制并排序行',
+            click: () => copyHistoryItemWithTransform(item.id, 'sort-lines')
+          },
+          { type: 'separator' },
+          {
+            label: '粘贴为单行',
+            click: () => pasteHistoryItemWithTransform(item.id, 'single-line')
+          },
+          {
+            label: '粘贴并去多余空格',
+            click: () => pasteHistoryItemWithTransform(item.id, 'clean-spaces')
+          }
+        ]
       }
     ] : []),
     { type: 'separator' },
@@ -805,7 +1040,21 @@ function pasteHistoryItem(id) {
 }
 
 function pasteHistoryItemAsTable(id) {
+  if (!canUseProFeature('tableTools')) return false;
   const copied = copyHistoryItemAsTable(id);
+  if (!copied) return false;
+
+  hidePanelWindow();
+  if (lastFocusedExternalWindow && !lastFocusedExternalWindow.isDestroyed()) {
+    lastFocusedExternalWindow.focus();
+  }
+  setTimeout(sendPasteToLastFocusedWindow, 60);
+  return true;
+}
+
+function pasteHistoryItemWithTransform(id, action) {
+  if (!canUseProFeature('textTransforms')) return false;
+  const copied = copyHistoryItemWithTransform(id, action);
   if (!copied) return false;
 
   hidePanelWindow();
@@ -833,7 +1082,7 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('close', (event) => {
-    if (state.settings.hideOnClose && !app.isQuitting) {
+    if (canUseProFeature('trayClose') && state.settings.hideOnClose && !app.isQuitting) {
       event.preventDefault();
       mainWindow.hide();
     }
@@ -975,6 +1224,84 @@ function setupIpc() {
   ipcMain.handle('clipboard-lite:paste-item-as-table', (_event, id) => {
     return pasteHistoryItemAsTable(id);
   });
+  ipcMain.handle('clipboard-lite:copy-item-transformed', (_event, id, action) => {
+    return copyHistoryItemWithTransform(id, action);
+  });
+  ipcMain.handle('clipboard-lite:paste-item-transformed', (_event, id, action) => {
+    return pasteHistoryItemWithTransform(id, action);
+  });
+  ipcMain.handle('clipboard-lite:get-plan-comparison', () => getPlanComparison());
+  ipcMain.handle('clipboard-lite:save-template', (_event, template) => {
+    if (!canUseProFeature('templates')) return false;
+    const normalized = normalizeTemplate(template || {});
+    if (!normalized.content) return false;
+    const existing = state.templates.find(entry => entry.id === normalized.id);
+    if (existing) Object.assign(existing, normalized, { updatedAt: new Date().toISOString() });
+    else state.templates.unshift(normalized);
+    saveState();
+    broadcastState();
+    return normalized;
+  });
+  ipcMain.handle('clipboard-lite:delete-template', (_event, id) => {
+    if (!canUseProFeature('templates')) return false;
+    state.templates = state.templates.filter(template => template.id !== id);
+    saveState();
+    broadcastState();
+    return true;
+  });
+  ipcMain.handle('clipboard-lite:copy-template', (_event, id) => {
+    if (!canUseProFeature('templates')) return false;
+    const template = state.templates.find(entry => entry.id === id);
+    if (!template) return false;
+    suppressNextClipboardRead = true;
+    clipboard.writeText(template.content);
+    template.updatedAt = new Date().toISOString();
+    saveState();
+    broadcastState();
+    return true;
+  });
+  ipcMain.handle('clipboard-lite:export-backup', async () => {
+    if (!canUseProFeature('backupRestore')) return false;
+    const target = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Cliply backup',
+      defaultPath: `cliply-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (target.canceled || !target.filePath) return false;
+    fs.writeFileSync(target.filePath, JSON.stringify(makeBackupPayload(), null, 2), 'utf8');
+    return true;
+  });
+  ipcMain.handle('clipboard-lite:import-backup', async () => {
+    if (!canUseProFeature('backupRestore')) return false;
+    const target = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Cliply backup',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (target.canceled || !target.filePaths?.[0]) return false;
+    const backup = JSON.parse(fs.readFileSync(target.filePaths[0], 'utf8'));
+    state.settings = { ...DEFAULT_SETTINGS, ...(backup.settings || {}), maxItems: Math.min(getHistoryLimit(state.subscription), Math.max(20, Number(backup.settings?.maxItems) || DEFAULT_SETTINGS.maxItems)) };
+    state.securityRules = { ...DEFAULT_SECURITY_RULES, ...(backup.securityRules || {}) };
+    state.templates = Array.isArray(backup.templates) ? backup.templates.map(normalizeTemplate).filter(template => template.content) : state.templates;
+    state.history = Array.isArray(backup.history) ? sortHistoryItems(backup.history.map(normalizeExistingItem)).slice(0, getHistoryLimit(state.subscription)) : state.history;
+    saveState();
+    broadcastState();
+    return true;
+  });
+  ipcMain.handle('clipboard-lite:create-checkout', async (_event, payload) => {
+    return paymentClient.createCheckout(payload || {});
+  });
+  ipcMain.handle('clipboard-lite:activate-license', async (_event, payload) => {
+    const result = await paymentClient.activateLicense(payload || {});
+    applySubscription(result.subscription);
+    return result;
+  });
+  ipcMain.handle('clipboard-lite:refresh-subscription', async () => {
+    if (!state.subscription.licenseKey) return { subscription: state.subscription };
+    const result = await paymentClient.refreshSubscription({ licenseKey: state.subscription.licenseKey });
+    applySubscription(result.subscription);
+    return result;
+  });
   ipcMain.handle('clipboard-lite:copy-text', (_event, text) => {
     suppressNextClipboardRead = true;
     clipboard.writeText(String(text || ''));
@@ -1010,7 +1337,9 @@ function setupIpc() {
       ...state.settings,
       ...nextSettings,
       panelShortcut: nextShortcut,
-      maxItems: Math.min(2000, Math.max(20, Number(nextSettings.maxItems) || DEFAULT_SETTINGS.maxItems))
+      hideOnClose: canUseProFeature('trayClose') ? !!nextSettings.hideOnClose : false,
+      sensitiveProtectionInitialized: Object.prototype.hasOwnProperty.call(nextSettings, 'sensitiveProtection') ? true : state.settings.sensitiveProtectionInitialized,
+      maxItems: Math.min(getHistoryLimit(state.subscription), Math.max(20, Number(nextSettings.maxItems) || DEFAULT_SETTINGS.maxItems))
     };
     if (nextShortcut !== previousShortcut) {
       globalShortcut.unregister(previousShortcut);
@@ -1020,6 +1349,7 @@ function setupIpc() {
         throw new Error(`快捷键 ${nextShortcut} 已被占用或不可用`);
       }
     }
+    applySensitiveProtectionToHistory();
     state.history = state.history.slice(0, state.settings.maxItems);
     applySystemSettings();
     createAppMenu();

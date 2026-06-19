@@ -22,6 +22,7 @@
           </div>
         </div>
         <div class="hero-actions">
+          <button id="planBtn" class="ghost">普通版</button>
           <button id="settingsBtn" class="ghost">设置</button>
           <button id="clearBtn" class="danger">清空历史</button>
         </div>
@@ -55,6 +56,21 @@
         <aside class="left-panel glass">
           <div class="panel-title">内容筛选</div>
           <nav id="categoryList" class="category-list"></nav>
+
+          <div class="template-section">
+            <div class="panel-title compact">常用文案 <span class="pro-badge">Pro</span></div>
+            <p class="template-help">保存常用内容，点击复制后手动粘贴。</p>
+            <label class="field">
+              <span>标题</span>
+              <input id="templateTitleInput" type="text" placeholder="例如：客服回复" />
+            </label>
+            <label class="field">
+              <span>内容</span>
+              <textarea id="templateContentInput" placeholder="保存常用内容，点击复制后手动粘贴"></textarea>
+            </label>
+            <button id="saveTemplateBtn" class="primary full">保存文案</button>
+            <div id="templateList" class="template-list"></div>
+          </div>
         </aside>
 
         <section class="center-panel glass">
@@ -90,10 +106,20 @@
             <div id="detailMedia" class="detail-media hidden"></div>
             <textarea id="detailValue" readonly placeholder="内容会显示在这里"></textarea>
 
+            <div id="textTools" class="text-tools hidden">
+              <div class="text-tools-title">文本增强 <span class="pro-badge">Pro</span></div>
+              <div class="text-tools-grid">
+                <button data-text-action="single-line" class="ghost">复制为单行</button>
+                <button data-text-action="clean-spaces" class="ghost">去多余空格</button>
+                <button data-text-action="dedupe-lines" class="ghost">去重行</button>
+                <button data-text-action="sort-lines" class="ghost">排序行</button>
+              </div>
+            </div>
+
             <div class="detail-actions">
               <button id="detailCopyBtn" class="primary">复制内容</button>
-              <button id="detailCopyTableBtn" class="primary hidden">Copy as table</button>
-              <button id="detailPasteTableBtn" class="primary hidden">Paste as table</button>
+              <button id="detailCopyTableBtn" class="primary hidden">复制为表格</button>
+              <button id="detailPasteTableBtn" class="primary hidden">粘贴为表格</button>
               <button id="detailFavoriteBtn" class="ghost">收藏</button>
               <button id="detailDeleteBtn" class="danger">删除</button>
             </div>
@@ -132,10 +158,39 @@
               </span>
               <input id="closeHideToggle" type="checkbox" />
             </label>
+            <label class="switch-row">
+              <span>
+                <strong>开机自动启动</strong>
+                <small>登录 Windows 后自动启动轻剪，继续保留剪贴板历史。</small>
+              </span>
+              <input id="launchOnStartupToggle" type="checkbox" />
+            </label>
             <label class="field card-field">
               <span>最大保存条数</span>
               <input id="maxItemsInput" type="number" min="20" max="2000" step="10" />
             </label>
+          </div>
+
+          <div class="settings-section">
+            <div class="section-title">PRO 数据能力</div>
+            <label class="switch-row">
+              <span>
+                <strong>敏感内容保护</strong>
+                <small>自动识别密码、Token、银行卡号和身份证号，避免明文进入历史。</small>
+              </span>
+              <input id="sensitiveProtectionToggle" type="checkbox" />
+            </label>
+            <label class="field card-field">
+              <span>命中敏感内容时</span>
+              <select id="sensitiveActionSelect">
+                <option value="redact">打码保存</option>
+                <option value="skip">不保存</option>
+              </select>
+            </label>
+            <div class="backup-actions">
+              <button id="exportBackupBtn" class="ghost">导出备份</button>
+              <button id="importBackupBtn" class="ghost">导入备份</button>
+            </div>
           </div>
 
           <div class="settings-section accent">
@@ -155,9 +210,40 @@
         <div class="settings-actions">
           <button id="resetShortcutBtn" class="ghost">恢复默认快捷键</button>
           <div>
+            <button id="settingsUpgradeBtn" class="ghost">升级 Pro</button>
             <button id="settingsCancelBtn" class="ghost">取消</button>
             <button id="saveSettingsBtn" class="primary">保存设置</button>
           </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="upgradeOverlay" class="settings-overlay hidden">
+      <section class="upgrade-modal glass" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle">
+        <div class="settings-head">
+          <div>
+            <div class="panel-title">CLIPLY PRO</div>
+            <h2 id="upgradeTitle">升级 Pro 解锁高级功能</h2>
+            <p>普通版继续保留收藏、置顶和全局快捷键；表格、文本增强、图片/文件记录等高级能力需要 Pro。</p>
+          </div>
+          <button id="upgradeCloseBtn" class="icon-btn" aria-label="关闭升级弹窗">×</button>
+        </div>
+        <div id="upgradeReason" class="upgrade-reason hidden"></div>
+        <div id="comparisonTable" class="comparison-table"></div>
+        <div class="settings-grid">
+          <label>
+            <span>支付邮箱</span>
+            <input id="checkoutEmailInput" type="email" placeholder="你的邮箱，可先留空测试" />
+          </label>
+          <button id="openCheckoutBtn" class="primary" type="button">打开支付页</button>
+          <label>
+            <span>授权码</span>
+            <input id="licenseKeyInput" type="text" placeholder="支付完成后粘贴授权码" />
+          </label>
+          <button id="activateLicenseBtn" class="primary" type="button">激活 Pro</button>
+        </div>
+        <div class="settings-actions">
+          <button id="upgradeCancelBtn" class="ghost">暂不升级</button>
         </div>
       </section>
     </div>

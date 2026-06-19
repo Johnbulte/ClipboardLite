@@ -78,6 +78,10 @@ button, input { font: inherit; }
   color: var(--ink);
 }
 
+.hidden {
+  display: none !important;
+}
+
 .history-list {
   min-height: 0;
   flex: 1;

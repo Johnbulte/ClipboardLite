@@ -14,6 +14,7 @@ const el = {
 };
 
 function typeLabel(key) {
+  if (key === 'table') return '表格';
   return {
     text: '文本',
     link: '链接',
@@ -135,6 +136,10 @@ function render() {
 async function pasteSelected() {
   const item = getItems()[state.selectedIndex];
   if (!item) return;
+  if (item.type === 'table') {
+    await api.pasteItemAsTable(item.id);
+    return;
+  }
   await api.pasteItem(item.id);
 }
 
