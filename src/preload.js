@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('clipboardLite', {
   togglePin: (id) => ipcRenderer.invoke('clipboard-lite:toggle-pin', id),
   showItemMenu: (id) => ipcRenderer.invoke('clipboard-lite:show-item-menu', id),
   pasteItem: (id) => ipcRenderer.invoke('clipboard-lite:paste-item', id),
+  copyItemAsTable: (id) => ipcRenderer.invoke('clipboard-lite:copy-item-as-table', id),
+  pasteItemAsTable: (id) => ipcRenderer.invoke('clipboard-lite:paste-item-as-table', id),
   copyText: (text) => ipcRenderer.invoke('clipboard-lite:copy-text', text),
   toggleFavorite: (id) => ipcRenderer.invoke('clipboard-lite:toggle-favorite', id),
   deleteItem: (id) => ipcRenderer.invoke('clipboard-lite:delete-item', id),
