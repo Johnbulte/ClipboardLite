@@ -513,7 +513,7 @@ function upsertClipboardItem(nextItem) {
       item.tableRows = parsedTable.rows;
       item.tableRowCount = parsedTable.rowCount;
       item.tableColumnCount = parsedTable.columnCount;
-      item.preview = `表格 ${parsedTable.rowCount} 行 x ${parsedTable.columnCount} 列`;
+      item.preview = `Table ${parsedTable.rowCount} rows x ${parsedTable.columnCount} cols`;
     } else {
       item.preview = previewOf(item.value);
       item.type = detectType(item.value);
