@@ -3,3 +3,8 @@ dist/
 *.log
 src/renderer/.cache/
 %SystemDrive%/
+qt/build/
+qt/.qtcreator/
+qt/*.log
+qt/err.txt
+qt/out.txt
