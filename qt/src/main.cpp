@@ -15,6 +15,7 @@
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QScreen>
+#include <QSettings>
 #include <QStringList>
 #include <QSystemTrayIcon>
 #include <QTimer>
@@ -37,38 +38,6 @@ static bool isImageFilePath(const QString &path)
 }
 
 static bool addClipboardMimeData(HistoryModel &historyModel, const QMimeData *mimeData)
-{
-    if (!mimeData) {
-        return false;
-    }
-
-    if (mimeData->hasImage()) {
-        historyModel.addImagePath(QStringLiteral("剪贴板图片"));
-        return true;
-    }
-
-    for (const QUrl &url : mimeData->urls()) {
-        const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
-        if (isImageFilePath(path)) {
-            historyModel.addImagePath(path);
-            return true;
-        }
-    }
-
-    const QString text = mimeData->text().trimmed();
-    if (text.startsWith(QStringLiteral("file://"), Qt::CaseInsensitive)) {
-        const QString path = QUrl(text).toLocalFile();
-        if (isImageFilePath(path)) {
-            historyModel.addImagePath(path);
-            return true;
-        }
-    }
-
-    historyModel.addText(text);
-    return !text.isEmpty();
-}
-
-static bool addClipboardMimeDataV2(HistoryModel &historyModel, const QMimeData *mimeData)
 {
     if (!mimeData) {
         return false;
@@ -336,6 +305,89 @@ public slots:
     }
 };
 
+class SettingsController final : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(bool clipboardListening READ clipboardListening WRITE setClipboardListening NOTIFY clipboardListeningChanged)
+    Q_PROPERTY(bool launchAtStartup READ launchAtStartup WRITE setLaunchAtStartup NOTIFY launchAtStartupChanged)
+    Q_PROPERTY(bool proEnabled READ proEnabled WRITE setProEnabled NOTIFY proEnabledChanged)
+
+public:
+    explicit SettingsController(HistoryModel *model, QObject *parent = nullptr)
+        : QObject(parent)
+        , m_model(model)
+    {
+        loadSettings();
+    }
+
+    bool clipboardListening() const { return m_clipboardListening; }
+    void setClipboardListening(bool enabled) {
+        if (m_clipboardListening == enabled) return;
+        m_clipboardListening = enabled;
+        saveSetting(QStringLiteral("clipboardListening"), enabled);
+        emit clipboardListeningChanged();
+    }
+
+    bool launchAtStartup() const { return m_launchAtStartup; }
+    void setLaunchAtStartup(bool enabled) {
+        if (m_launchAtStartup == enabled) return;
+        m_launchAtStartup = enabled;
+        applyLaunchAtStartup(enabled);
+        saveSetting(QStringLiteral("launchAtStartup"), enabled);
+        emit launchAtStartupChanged();
+    }
+
+    bool proEnabled() const {
+        return m_model ? m_model->proEnabled() : false;
+    }
+
+    void setProEnabled(bool enabled) {
+        if (!m_model) return;
+        m_model->setProEnabled(enabled);
+        saveSetting(QStringLiteral("proEnabled"), enabled);
+        emit proEnabledChanged();
+    }
+
+signals:
+    void clipboardListeningChanged();
+    void launchAtStartupChanged();
+    void proEnabledChanged();
+
+private:
+    void loadSettings() {
+        QSettings settings;
+        m_clipboardListening = settings.value(QStringLiteral("clipboardListening"), true).toBool();
+        m_launchAtStartup = settings.value(QStringLiteral("launchAtStartup"), false).toBool();
+        const bool savedPro = settings.value(QStringLiteral("proEnabled"), false).toBool();
+        if (m_model && savedPro) {
+            m_model->setProEnabled(true);
+        }
+    }
+
+    void saveSetting(const QString &key, const QVariant &value) {
+        QSettings settings;
+        settings.setValue(key, value);
+    }
+
+    void applyLaunchAtStartup(bool enabled) {
+#ifdef Q_OS_WIN
+        QSettings registry(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
+                          QSettings::NativeFormat);
+        if (enabled) {
+            const QString appPath = QCoreApplication::applicationFilePath();
+            registry.setValue(QStringLiteral("Cliply"), QStringLiteral("\"%1\"").arg(appPath));
+        } else {
+            registry.remove(QStringLiteral("Cliply"));
+        }
+#else
+        Q_UNUSED(enabled);
+#endif
+    }
+
+    HistoryModel *m_model = nullptr;
+    bool m_clipboardListening = true;
+    bool m_launchAtStartup = false;
+};
+
 static ClipboardItem makeDemoItem(const QString &id, const QString &value)
 {
     const auto type = ContentClassifier::classifyText(value);
@@ -367,16 +419,48 @@ int main(int argc, char *argv[])
     QApplication::setQuitOnLastWindowClosed(false);
 
     HistoryModel historyModel;
-    historyModel.addItem(makeDemoItem(QStringLiteral("demo-2"), QStringLiteral("基础功能永久免费")));
-    historyModel.addItem(makeDemoItem(QStringLiteral("demo-3"), QStringLiteral("可以识别代码和链接")));
-    historyModel.addItem(makeDemoItem(QStringLiteral("demo-4"), QStringLiteral("ctrl+shift+v可调出快捷窗口")));
-    historyModel.addItem(makeDemoItem(QStringLiteral("demo-5"), QStringLiteral("这是来自 Qt/QML 原生版本的剪贴板历史示例。")));
+
+    // Try to load persisted history first
+    const bool hasHistory = historyModel.load();
+
+    // Only add demo items on first run (no persisted data)
+    if (!hasHistory) {
+        historyModel.addItem(makeDemoItem(QStringLiteral("demo-2"), QStringLiteral("基础功能永久免费")));
+        historyModel.addItem(makeDemoItem(QStringLiteral("demo-3"), QStringLiteral("可以识别代码和链接")));
+        historyModel.addItem(makeDemoItem(QStringLiteral("demo-4"), QStringLiteral("ctrl+shift+v可调出快捷窗口")));
+        historyModel.addItem(makeDemoItem(QStringLiteral("demo-5"), QStringLiteral("这是来自 Qt/QML 原生版本的剪贴板历史示例。")));
+    }
 
     HistoryFilterModel historyFilterModel;
     historyFilterModel.setSourceModel(&historyModel);
 
-    QObject::connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, &historyModel, [&historyModel] {
-        addClipboardMimeDataV2(historyModel, QGuiApplication::clipboard()->mimeData());
+    SettingsController settingsController(&historyModel);
+
+    QMetaObject::Connection clipboardConnection;
+    const auto connectClipboard = [&] {
+        clipboardConnection = QObject::connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, &historyModel, [&historyModel] {
+            addClipboardMimeData(historyModel, QGuiApplication::clipboard()->mimeData());
+        });
+    };
+    const auto disconnectClipboard = [&] {
+        if (clipboardConnection) {
+            QObject::disconnect(clipboardConnection);
+            clipboardConnection = {};
+        }
+    };
+
+    // Connect if listening is enabled (default)
+    if (settingsController.clipboardListening()) {
+        connectClipboard();
+    }
+
+    // React to clipboardListening toggle
+    QObject::connect(&settingsController, &SettingsController::clipboardListeningChanged, &app, [&] {
+        if (settingsController.clipboardListening()) {
+            connectClipboard();
+        } else {
+            disconnectClipboard();
+        }
     });
 
     QWindow *mainWindow = nullptr;
@@ -392,6 +476,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("historyModel"), &historyModel);
     engine.rootContext()->setContextProperty(QStringLiteral("historyFilterModel"), &historyFilterModel);
     engine.rootContext()->setContextProperty(QStringLiteral("shortcutController"), &shortcutController);
+    engine.rootContext()->setContextProperty(QStringLiteral("settingsController"), &settingsController);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] {
         QCoreApplication::exit(-1);

@@ -3,6 +3,8 @@
 #include "core/ClipboardItem.h"
 
 #include <QAbstractListModel>
+#include <QHash>
+#include <QTimer>
 #include <QVector>
 
 class HistoryModel : public QAbstractListModel {
@@ -36,8 +38,11 @@ public:
     Q_INVOKABLE void clear();
     Q_INVOKABLE int favoriteCount() const;
     Q_INVOKABLE int typeCount(const QString &type) const;
+    Q_INVOKABLE QVariantMap categoryCounts() const;
     Q_INVOKABLE void addText(const QString &value);
     Q_INVOKABLE void addImagePath(const QString &path);
+    Q_INVOKABLE bool load();
+    Q_INVOKABLE bool save();
     int maxItems() const;
     void setMaxItems(int maxItems);
     bool proEnabled() const;
@@ -54,8 +59,13 @@ private:
     int historyLimit() const;
     int clampMaxItems(int value) const;
     void trimToLimit();
+    void scheduleSave();
+    bool containsValue(const QString &value, const QString &type = QString()) const;
 
     QVector<ClipboardItem> m_items;
+    QHash<QString, int> m_valueIndex;
+    QString m_storePath;
+    QTimer m_saveTimer;
     int m_maxItems = 100;
     bool m_proEnabled = false;
 };

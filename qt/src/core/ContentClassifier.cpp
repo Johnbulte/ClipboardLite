@@ -81,10 +81,33 @@ bool ContentClassifier::looksLikeTable(const QString &value)
 
 bool ContentClassifier::looksLikeCode(const QString &value)
 {
-    static const QRegularExpression keywordPattern(QStringLiteral("\\b(?:const|let|var|function|class|import|export|return|if|for|while|auto|QString|int|void)\\b"));
-    return keywordPattern.match(value).hasMatch()
-        || value.contains(QLatin1Char('{'))
-        || value.contains(QLatin1Char('}'))
-        || value.contains(QStringLiteral("=>"))
-        || value.contains(QStringLiteral("::"));
+    static const QRegularExpression keywordPattern(QStringLiteral(
+        "\\b(?:const|let|var|function|class|import|export|return|if|else|for|while|switch|case|break|"
+        "auto|QString|int|void|public|private|protected|namespace|struct|enum|typedef|template|"
+        "def|print|elif|lambda|None|True|False|self)\\b"));
+
+    const bool hasKeyword = keywordPattern.match(value).hasMatch();
+
+    // Count code-like indicators
+    int indicators = 0;
+    if (hasKeyword) ++indicators;
+    if (value.contains(QStringLiteral("=>"))) ++indicators;
+    if (value.contains(QStringLiteral("::"))) ++indicators;
+    if (value.contains(QStringLiteral("();"))) ++indicators;
+    if (value.contains(QStringLiteral("{")) && value.contains(QStringLiteral("}"))) ++indicators;
+    if (value.contains(QStringLiteral("!=")) || value.contains(QStringLiteral("=="))) ++indicators;
+    if (value.contains(QStringLiteral("++")) || value.contains(QStringLiteral("--"))) ++indicators;
+
+    // Require at least 2 indicators to classify as code
+    // This prevents single `{` (e.g. JSON) from being misclassified
+    if (indicators >= 2) {
+        return true;
+    }
+
+    // Strong single indicators that are almost certainly code
+    if (value.contains(QStringLiteral("};"))) return true;
+    if (value.contains(QStringLiteral("function "))) return true;
+    if (value.contains(QStringLiteral("class "))) return true;
+
+    return false;
 }

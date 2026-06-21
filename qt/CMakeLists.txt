@@ -13,6 +13,7 @@ qt_policy(SET QTP0004 NEW)
 
 set(CLIPLY_CORE_SOURCES
     src/core/ContentClassifier.cpp
+    src/core/HistoryStore.cpp
     src/models/HistoryFilterModel.cpp
     src/models/HistoryModel.cpp
 )
@@ -20,6 +21,7 @@ set(CLIPLY_CORE_SOURCES
 set(CLIPLY_CORE_HEADERS
     src/core/ClipboardItem.h
     src/core/ContentClassifier.h
+    src/core/HistoryStore.h
     src/models/HistoryFilterModel.h
     src/models/HistoryModel.h
 )
@@ -62,6 +64,8 @@ qt_add_executable(tst_history_model
     tests/tst_history_model.cpp
     src/core/ContentClassifier.cpp
     src/core/ContentClassifier.h
+    src/core/HistoryStore.cpp
+    src/core/HistoryStore.h
     src/models/HistoryModel.cpp
     src/models/HistoryModel.h
     src/core/ClipboardItem.h
@@ -76,6 +80,8 @@ qt_add_executable(tst_history_filter_model
     tests/tst_history_filter_model.cpp
     src/core/ContentClassifier.cpp
     src/core/ContentClassifier.h
+    src/core/HistoryStore.cpp
+    src/core/HistoryStore.h
     src/models/HistoryFilterModel.cpp
     src/models/HistoryFilterModel.h
     src/models/HistoryModel.cpp

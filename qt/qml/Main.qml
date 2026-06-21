@@ -31,11 +31,11 @@ ApplicationWindow {
     property bool compactLayout: width < 1180
     property bool veryCompactLayout: width < 930
     property string copyToastMessage: ""
-    property bool launchAtStartup: false
-    property bool clipboardListening: true
+    property bool launchAtStartup: settingsController.launchAtStartup
+    property bool clipboardListening: settingsController.clipboardListening
     property string globalShortcut: "Ctrl+Shift+V"
     property bool shortcutRecording: false
-    property bool proEnabled: false
+    property bool proEnabled: historyModel.proEnabled
     property bool proComparisonOpen: false
 
     function isModifierOnlyKey(key) {
@@ -111,14 +111,15 @@ ApplicationWindow {
     }
 
     function refreshCounts() {
-        totalCount = historyModel.rowCount()
-        favoriteTotal = historyModel.favoriteCount()
-        textTotal = historyModel.typeCount("text")
-        linkTotal = historyModel.typeCount("link")
-        codeTotal = historyModel.typeCount("code")
-        emailTotal = historyModel.typeCount("email")
-        colorTotal = historyModel.typeCount("color")
-        tableTotal = historyModel.typeCount("table")
+        var counts = historyModel.categoryCounts()
+        totalCount = counts.total
+        favoriteTotal = counts.favorite
+        textTotal = counts.text
+        linkTotal = counts.link
+        codeTotal = counts.code
+        emailTotal = counts.email
+        colorTotal = counts.color
+        tableTotal = counts.table
     }
 
     function selectRow(row) {
@@ -676,7 +677,7 @@ ApplicationWindow {
                         Text { text: root.clipboardListening ? "监听开启" : "监听关闭"; color: "#6d5dfc"; font.pixelSize: 13; font.bold: true }
                         Switch {
                             checked: root.clipboardListening
-                            onToggled: root.clipboardListening = checked
+                            onToggled: settingsController.clipboardListening = checked
                         }
                     }
                 }
@@ -699,7 +700,7 @@ ApplicationWindow {
                         }
                         Switch {
                             checked: root.launchAtStartup
-                            onToggled: root.launchAtStartup = checked
+                            onToggled: settingsController.launchAtStartup = checked
                         }
                     }
                 }
@@ -971,7 +972,12 @@ ApplicationWindow {
         proEnabled: root.proEnabled
         visible: root.proComparisonOpen
         onClosed: root.proComparisonOpen = false
-        onUpgradeRequested: root.showCopyToast("Pro 支付暂未接入，升级入口即将开放")
+        onUpgradeRequested: {
+            // Activate Pro (demo mode - no payment gateway integrated yet)
+            settingsController.proEnabled = true
+            root.showCopyToast("Pro 已激活，高级功能已解锁")
+            root.proComparisonOpen = false
+        }
     }
 
     component FeatureCard: Rectangle {
